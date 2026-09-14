@@ -226,11 +226,11 @@ async def client(reader,writer):
             # Return a simple HTTP 200 response so Render can detect the port.
             body=b"RNG Adventure Online OK"
             response=(
-                "HTTP/1.1 200 OK\\r\\n"
-                "Content-Type: text/plain; charset=utf-8\\r\\n"
-                f"Content-Length: {len(body)}\\r\\n"
-                "Connection: close\\r\\n"
-                "\\r\\n"
+                "HTTP/1.1 200 OK\r\n"
+                "Content-Type: text/plain; charset=utf-8\r\n"
+                f"Content-Length: {len(body)}\r\n"
+                "Connection: close\r\n"
+                "\r\n"
             ).encode()+body
             writer.write(response)
             await writer.drain()
