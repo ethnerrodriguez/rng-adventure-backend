@@ -1,3 +1,4 @@
+import os
 HOST="0.0.0.0"
 PORT=int(os.environ.get("PORT", "8765"))
 VERSION="v1.00.33"
@@ -198,7 +199,7 @@ async def do_action(p,m):
         else:
             await send(p.ws,{"type":"error","message":"Invalid value."})
     elif a=="update_log":
-        await send(p.ws,{"type":"result","text":"v1.00.33\n• Render-ready WebSocket multiplayer server.\n• Browser client can connect online."})
+        await send(p.ws,{"type":"result","text":"v1.00.31\n• WebSocket multiplayer server added.\n• Browser client can connect online."})
 
 async def client(reader,writer):
     p=None
