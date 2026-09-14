@@ -1,32 +1,16 @@
-#!/usr/bin/env python3
-"""
-RNG Adventure Online v1.00.33 - WebSocket Server
-Standard-library WebSocket server (no third-party packages required).
-
-Run:
-    python server.py
-
-Default:
-    0.0.0.0:8765
-
-The HTML5 client can connect using:
-    wss://YOUR-SERVICE.onrender.com
-
-For internet hosting on Render, use the public wss:// URL supplied by Render.
-"""
-
-import asyncio, base64, hashlib, json, random, struct, os
-from collections import Counter
-
 HOST="0.0.0.0"
 PORT=int(os.environ.get("PORT", "8765"))
 VERSION="v1.00.33"
 
 ITEMS={
 "Rotten_Sword":[5,50],"Wooden_Sword":[10,40],"Stone_Sword":[15,30],"Gold_sword":[20,15],
-"Diamond_sword":[25,10],"Netherite_Sword":[30,1],"Mythicite_Sword":[35,.35],"Ultracult_Sword":[40,.12],"Divinite_Sword":[45,.05],"Sigma_Sword":[50,.02],"Aurarizz_Sword":[55,.01],"Glock_15":[60,.006],"Glock_16":[65,.004],"Glock_17":[70,.002],"Glock_18":[75,.001],"Glock_19":[250,.0005],"Ak_47":[500,.0002],
+"Diamond_sword":[25,10],"Netherite_Sword":[30,5],"Mythicite_Sword":[35,3],"Ultracult_Sword":[40,1],
+"Divinite_Sword":[45,.8],"Sigma_Sword":[50,.75],"Aurarizz_Sword":[55,.5],"Glock_15":[60,.4],
+"Glock_16":[65,.3],"Glock_17":[70,.15],"Glock_18":[75,.1],"Glock_19":[250,.15],"Ak_47":[500,.1],
 "Leather_Armor":[5,50],"Stone_Armor":[10,40],"Iron_Armor":[15,35],"Gold_Armor":[20,30],
-"Diamond_Armor":[25,20],"Netherite_Armor":[30,1],"Mythicite_Armor":[35,.25],"Ultracult_Armor":[40,.1],"Divinite_Armor":[45,.04],"Sigma_Armor":[50,.015],"Aurarizz_Armor":[75,.007],"Da_Drip":[100,.003],"Liquid_Gold":[250,.0015],"Lightning?????":[500,.0007],"Dark_matter":[750,.0002],"AC_130":[750,.0001]
+"Diamond_Armor":[25,20],"Netherite_Armor":[30,10],"Mythicite_Armor":[35,1.5],"Ultracult_Armor":[40,1],
+"Divinite_Armor":[45,.5],"Sigma_Armor":[50,.3],"Aurarizz_Armor":[75,.2],"Da_Drip":[100,.15],
+"Liquid_Gold":[250,.1],"Lightning?????":[500,.05],"Dark_matter":[750,.02],"AC_130":[750,.01]
 }
 MONSTERS={"Angry_traveler":[25,50],"Zombie":[35,40],"Skeleton":[40,35],"Bro_from_school":[45,30],
 "Lil_Tim":[50,20],"Rizzler":[55,15],"School":[60,10],"That_one_kid":[65,5],"Ur_mom":[70,3.5],
@@ -54,10 +38,6 @@ def weighted(obj,luck):
         r-=w
         if r<=0: return name
     return entries[-1][0]
-
-def is_super_rare(item):
-    return (item in {"Netherite_Sword","Mythicite_Sword","Ultracult_Sword","Divinite_Sword","Sigma_Sword","Aurarizz_Sword","Glock_15","Glock_16","Glock_17","Glock_18","Glock_19","Ak_47"}
-            or item in {"Netherite_Armor","Mythicite_Armor","Ultracult_Armor","Divinite_Armor","Sigma_Armor","Aurarizz_Armor","Da_Drip","Liquid_Gold","Lightning?????","Dark_matter","AC_130"})
 
 def required_tier(item):
     if item in ("Admin_Sword","Admin_Armor"): return "admin"
@@ -133,8 +113,6 @@ async def do_action(p,m):
     if a=="roll":
         x=weighted(ITEMS,p.weapon_luck); p.inventory.append(x)
         await send(p.ws,state(p)); await send(p.ws,{"type":"result","text":f"🎲 You rolled {x}! | Value: {ITEMS[x][0]}"})
-        if is_super_rare(x):
-            await broadcast({"type":"log","message":f"📢 RARE DROP! {p.name} got {x}!"})
     elif a=="inventory":
         c=Counter(p.inventory)
         text="🎒 INVENTORY\n"+"\n".join(f"{x} x{n}" for x,n in sorted(c.items()))
@@ -204,47 +182,6 @@ async def do_action(p,m):
         if x in MONSTERS or x in ADMIN_MONSTERS:
             p.forced=x; await send(p.ws,{"type":"result","text":f"🛠 Next Event will force {x}."})
         else: await send(p.ws,{"type":"error","message":"Monster name not recognized."})
-    elif a=="admin_players":
-        if TIERS.index(p.admin) < TIERS.index("admin"):
-            await send(p.ws,{"type":"error","message":"Admin access required."})
-        else:
-            await send(p.ws,{"type":"admin_players","players":[{"name":x.name,"admin":x.admin} for x in players.values()]})
-    elif a=="admin_target":
-        if TIERS.index(p.admin) < TIERS.index("admin"):
-            await send(p.ws,{"type":"error","message":"Admin access required."})
-        else:
-            target_name=str(m.get("target","")).strip()
-            target=next((x for x in players.values() if x.name.lower()==target_name.lower()),None)
-            if not target:
-                await send(p.ws,{"type":"error","message":"Player is no longer online."})
-            elif TIERS.index(p.admin) < TIERS.index(target.admin):
-                await send(p.ws,{"type":"error","message":"You cannot modify a player with a higher admin rank."})
-            else:
-                kind=str(m.get("kind",""))
-                if kind=="item":
-                    x=str(m.get("item","")).strip(); req=required_tier(x)
-                    if not req or TIERS.index(p.admin) < TIERS.index(req):
-                        await send(p.ws,{"type":"error","message":"Item not recognized or rank too low."})
-                    else:
-                        target.inventory.append(x); await send(target.ws,state(target)); await send(target.ws,{"type":"result","text":f"🎁 {p.name} gave you {x}!"}); await send(p.ws,{"type":"result","text":f"🛠 Gave {x} to {target.name}."})
-                elif kind=="aura":
-                    try: v=int(float(m.get("value")))
-                    except (TypeError,ValueError): v=-1
-                    if v<0: await send(p.ws,{"type":"error","message":"Invalid Aura value."})
-                    else: target.aura=v; await send(target.ws,state(target)); await send(target.ws,{"type":"result","text":f"🎁 {p.name} set your Aura to {v}!"}); await send(p.ws,{"type":"result","text":f"🛠 Set {target.name}'s Aura to {v}."})
-                elif kind in ("weapon","monster"):
-                    try: v=float(m.get("value"))
-                    except (TypeError,ValueError): v=-1
-                    if v<0.01: await send(p.ws,{"type":"error","message":"Luck must be at least 0.01x."})
-                    elif kind=="weapon": target.weapon_luck=v; await send(target.ws,state(target)); await send(target.ws,{"type":"result","text":f"🎁 {p.name} set your Weapon Luck to {v:.2f}x!"}); await send(p.ws,{"type":"result","text":f"🛠 Set {target.name}'s Weapon Luck to {v:.2f}x."})
-                    else: target.monster_luck=v; await send(target.ws,state(target)); await send(target.ws,{"type":"result","text":f"🎁 {p.name} set your Monster Luck to {v:.2f}x!"}); await send(p.ws,{"type":"result","text":f"🛠 Set {target.name}'s Monster Luck to {v:.2f}x."})
-                elif kind=="spawn":
-                    x=str(m.get("enemy","")).strip()
-                    if x in MONSTERS or x in ADMIN_MONSTERS:
-                        target.forced=x; await send(target.ws,{"type":"state","player":{"name":target.name,"aura":target.aura,"inventory":target.inventory,"weapon_luck":target.weapon_luck,"monster_luck":target.monster_luck,"admin_level":target.admin,"forced_enemy_name":target.forced}}); await send(target.ws,{"type":"result","text":f"👾 {p.name} forced your next enemy to be {x}!"}); await send(p.ws,{"type":"result","text":f"🛠 Forced {target.name}'s next enemy to {x}."})
-                    else: await send(p.ws,{"type":"error","message":"Monster name not recognized."})
-                else:
-                    await send(p.ws,{"type":"error","message":"Unknown admin target action."})
     elif a=="chat":
         msg=str(m.get("message","")).strip()[:300]
         if msg: await broadcast({"type":"chat","name":p.name,"rank":p.admin.upper(),"message":msg})
@@ -261,7 +198,7 @@ async def do_action(p,m):
         else:
             await send(p.ws,{"type":"error","message":"Invalid value."})
     elif a=="update_log":
-        await send(p.ws,{"type":"result","text":"v1.00.33\n• WebSocket multiplayer server added.\n• Browser client can connect online."})
+        await send(p.ws,{"type":"result","text":"v1.00.33\n• Render-ready WebSocket multiplayer server.\n• Browser client can connect online."})
 
 async def client(reader,writer):
     p=None
