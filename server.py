@@ -9,7 +9,7 @@ from collections import Counter
 
 HOST="0.0.0.0"
 PORT=int(os.environ.get("PORT", "8765"))
-VERSION="v1.00.33"
+VERSION="v1.00.34"
 
 ITEMS={
 "Rotten_Sword":[5,50],"Wooden_Sword":[10,40],"Stone_Sword":[15,30],"Gold_sword":[20,15],
@@ -222,7 +222,19 @@ async def client(reader,writer):
                 k,v=line.split(":",1); h[k.lower().strip()]=v.strip()
         key=h.get("sec-websocket-key")
         if not key:
-            writer.close(); await writer.wait_closed(); return
+            # Render and normal HTTP health checks are not WebSocket clients.
+            # Return a simple HTTP 200 response so Render can detect the port.
+            body=b"RNG Adventure Online OK"
+            response=(
+                "HTTP/1.1 200 OK\\r\\n"
+                "Content-Type: text/plain; charset=utf-8\\r\\n"
+                f"Content-Length: {len(body)}\\r\\n"
+                "Connection: close\\r\\n"
+                "\\r\\n"
+            ).encode()+body
+            writer.write(response)
+            await writer.drain()
+            return
         accept=base64.b64encode(hashlib.sha1((key+"258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode()
         resp=("HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
               f"Sec-WebSocket-Accept: {accept}\r\n\r\n").encode()
@@ -255,8 +267,8 @@ async def client(reader,writer):
 
 async def main():
     server=await asyncio.start_server(client,HOST,PORT)
-    print(f"RNG Adventure Online {VERSION} WebSocket server listening on ws://{HOST}:{PORT}")
-    print("Press Ctrl+C to stop.")
+    print(f"RNG Adventure Online {VERSION} WebSocket server listening on ws://{HOST}:{PORT}", flush=True)
+    print("Press Ctrl+C to stop.", flush=True)
     async with server: await server.serve_forever()
 
 if __name__=="__main__":
